@@ -1,0 +1,26 @@
+# Build .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+TestResults/
+*.trx
+
+# Node / Angular (Paso 19)
+node_modules/
+dist/
+.angular/
+
+# Supabase CLI — metadatos locales usados para la auditoría del sistema antiguo.
+# Incluye referencia al proyecto de producción: no forman parte del proyecto .NET.
+supabase/
+
+# Auditoría — volcado del esquema de producción (privado, nunca versionar)
+danelix-production-public-schema.sql
+
+# Entorno / secretos
+.env
+*.env.local
+*.log
