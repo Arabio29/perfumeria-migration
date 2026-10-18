@@ -1,0 +1,5 @@
+# Reglas específicas para los proyectos de prueba (este archivo aplica a tests/ y subcarpetas).
+[*.cs]
+
+# Los tests usan la convención Metodo_Escenario_Resultado; el guion bajo es intencional.
+dotnet_diagnostic.CA1707.severity = none

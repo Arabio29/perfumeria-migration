@@ -1,0 +1,13 @@
+# Normaliza finales de línea de forma determinista: LF en Windows, CI Linux y Docker.
+# Toma precedencia sobre core.autocrlf para evitar sorpresas entre plataformas.
+* text=auto eol=lf
+
+# Binarios (git no debe tratarlos como texto)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.zip binary
+*.gz binary
+*.pdf binary

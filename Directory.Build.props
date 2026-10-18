@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    Propiedades comunes para todos los proyectos del repositorio.
+    MSBuild busca este archivo subiendo carpetas desde cada .csproj,
+    así que aplica a src/ y tests/ por igual.
+  -->
+  <PropertyGroup>
+    <!-- Analizadores del SDK: conjunto "Recommended" (más estricto que el default). -->
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <!-- Las reglas de estilo del .editorconfig también se evalúan en el build. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+</Project>
