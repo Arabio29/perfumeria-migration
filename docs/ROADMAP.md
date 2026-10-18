@@ -4,6 +4,8 @@ Plan maestro de reconstrucción del SaaS de perfumerías Arquitectura, datos, AP
 
 Edición: octubre 2026 | Enfoque: aprender construyendo | Origen: esquema SQL y descripción funcional proporcionados por el propietario
 
+**Estado de avance (17 oct 2026):** Paso 02 casi cerrado — solución .NET 10 con health checks y tests de integración, monorepo con calidad básica (editorconfig/analizadores), PostgreSQL 17 + pgvector en Docker Compose, ADR-001 y ADR-002 aceptadas. Pendiente: pipeline CI (requiere remoto en GitHub). Siguiente: Paso 03 (dominio + EF Core).
+
 REGLA CENTRAL: conservar la operación actual mientras se construye y verifica una plataforma nueva en paralelo. No ejecutar el esquema recibido directamente: se facilitó solo como contexto.
 
 ## 0. Cómo usar este manual
