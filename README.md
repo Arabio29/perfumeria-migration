@@ -1,5 +1,7 @@
 # Danelix
 
+[![CI](https://github.com/Arabio29/perfumeria-migration/actions/workflows/ci.yml/badge.svg)](https://github.com/Arabio29/perfumeria-migration/actions/workflows/ci.yml)
+
 SaaS multi-tenant para perfumerías. Este repositorio reconstruye la plataforma actual (React/Next.js + Supabase) hacia un monolito modular en ASP.NET Core, siguiendo el [roadmap del proyecto](docs/ROADMAP.md).
 
 - **Backend:** ASP.NET Core 10 + EF Core (monolito modular)
