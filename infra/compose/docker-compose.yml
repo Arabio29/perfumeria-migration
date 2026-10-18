@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: danelix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: danelix
+      POSTGRES_USER: danelix
+      # develop only 
+      POSTGRES_PASSWORD: danelix_dev
+    ports: 
+      - "5432:5432"
+    volumes:
+      - danelix_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U danelix -d danelix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+volumes:
+  danelix_pgdata:
+    name: danelix_pgdata
