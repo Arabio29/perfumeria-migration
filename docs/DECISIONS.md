@@ -6,3 +6,5 @@ Decisiones relevantes del proyecto con contexto, alternativas y consecuencias. U
 | --- | --- | --- | --- |
 | [ADR-001](adr/ADR-001-modular-monolith.md) | Monolito modular como arquitectura base | Aceptada | 2026-10-17 |
 | [ADR-002](adr/ADR-002-multi-tenant.md) | Multi-tenancy: base única con aislamiento derivado del servidor | Aceptada | 2026-10-17 |
+| [ADR-003](adr/ADR-003-dbcontext-por-modulo.md) | Persistencia: un DbContext por módulo | Aceptada (con pendientes) | 2026-10-21 |
+| [ADR-004](adr/ADR-004-autorizacion-por-ambitos.md) | Autorización por ámbitos: plataforma, tenant y sucursal | Aceptada | 2026-10-21 |

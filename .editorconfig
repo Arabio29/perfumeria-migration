@@ -57,3 +57,7 @@ csharp_space_after_cast = false
 csharp_space_after_keywords_in_control_flow_statements = true
 csharp_indent_case_contents = true
 csharp_indent_switch_labels = true
+
+# EF Core genera arrays inline en las migraciones; no editar a mano ese código generado.
+[**/Infrastructure/Persistence/Migrations/*.cs]
+dotnet_diagnostic.CA1861.severity = none

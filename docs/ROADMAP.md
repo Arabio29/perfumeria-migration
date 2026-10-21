@@ -4,7 +4,7 @@ Plan maestro de reconstrucción del SaaS de perfumerías Arquitectura, datos, AP
 
 Edición: octubre 2026 | Enfoque: aprender construyendo | Origen: esquema SQL y descripción funcional proporcionados por el propietario
 
-**Estado de avance (oct 2026):** Paso 02 cerrado — solución .NET 10 con health checks y tests de integración, monorepo con calidad básica (editorconfig/analizadores), PostgreSQL 17 + pgvector en Docker Compose, ADR-001 y ADR-002 aceptadas, y CI en GitHub Actions. Siguiente: Paso 03 (dominio + EF Core).
+**Estado de avance (oct 2026):** Pasos 02 y 03 cerrados: dominio Identity/Tenancy, dos `DbContext`, migraciones separadas, seed Development e integración Testcontainers para migraciones, constraints, idempotencia y concurrencia de TenantOwner. Siguiente: Paso 04, separar PlatformRole y el contexto `/platform`.
 
 REGLA CENTRAL: conservar la operación actual mientras se construye y verifica una plataforma nueva en paralelo. No ejecutar el esquema recibido directamente: se facilitó solo como contexto.
 
@@ -24,8 +24,8 @@ La base existente cubre identidad, empresas, sucursales, catálogo, stock, venta
 
 | Situación observada | Rediseño propuesto |
 | --- | --- |
-| super_admin en user_tenants / sesión | Separar identidad global PlatformAdmin de membresías TenantMember; |
-| atada a perfumería | panel /platform sin tenant activo. |
+| super_admin en user_tenants / sesión | Separar el rol global PlatformAdmin de las memberships de negocio; |
+| atado a perfumería | panel /platform sin tenant activo. |
 | ventas mezcla línea, cobro y | Sale + SaleItem + SalePayment + CashMovement; ingreso manual no es |
 | entrada_dinero | una venta. |
 | esencias tiene bala/bodega; envases | StockBalance + InventoryMovement por ubicación/producto; toda |
@@ -73,7 +73,7 @@ Patrón: monolito modular con límites claros por módulo y separación Domain /
 
 Repositorio: /apps/web-angular, /src/Danelix.Api, /src/Modules/{Identity,Tenancy,Catalog,Inventory,Sales,Rec eivables,Procurement,Finance,Reporting,Billing,Platform,Support,Notifications,AI}, /tests/{Unit,Integration,Architecture,E2E}, /infra/{compose,k3s,monitoring}, /docs/{adr,api,runbooks,migration}.
 
-Identity: usuario global único; PlatformRole (PlatformAdmin, SupportOperator) no necesita empresa; TenantMembership (TenantOwner, Admin, Staff) solo para tenant; BranchMembership opcional. Al acceder /platform no emitir tenant_id. Al acceder /app/{tenantSlug}, verificar membresía, estado de empresa y permisos en servidor. Evitar que tenant_id recibido por el cliente conceda autoridad.
+Identity/Tenancy (ver [ADR-004](adr/ADR-004-autorizacion-por-ambitos.md)): usuario global único; PlatformRole (`PlatformAdmin`, `SupportOperator`) separado de memberships de negocio; TenantMembership (`TenantOwner`, `TenantAdmin`, `TenantMember`) y BranchMembership (`BranchManager`, `BranchStaff`) con alcance explícito. Tenant representa una cuenta/empresa; Branch representa una sucursal. `/platform` no activa tenant; `/app/{tenantSlug}` identifica el workspace pero el servidor debe validar estado, membership, alcance y permiso. Los IDs/roles recibidos del cliente no conceden autoridad.
 
 
 ## 3. Modelo de datos recomendado (no copia literal)
@@ -81,8 +81,8 @@ Identity: usuario global único; PlatformRole (PlatformAdmin, SupportOperator) n
 | Módulo | Entidades/tablas objetivo y reglas |
 | --- | --- |
 |   | users, auth_sessions, mfa_factors, platform_roles, tenants, tenant_memberships, |
-| Identity & Tenancy | branches, branch_memberships, role_permissions; unique(user_id,tenant_id); |
-|   | unique(tenant_id,branch_id). |
+| Identity & Tenancy | branches, branch_memberships; roles de plataforma independientes de los roles |
+|   | TenantOwner/TenantAdmin/TenantMember y BranchManager/BranchStaff. |
 | Catalog | essences, bottles, product_recipes, suppliers, product_images; SKU único por tenant para |
 |   | activos; costos snapshot en transacciones. |
 |   | stock_balances(tenant,branch,product,location,quantity,version), stock_movements, |
@@ -99,11 +99,15 @@ Identity: usuario global único; PlatformRole (PlatformAdmin, SupportOperator) n
 | AI | knowledge_documents, document_chunks(tenant_id,embedding), ai_query_logs sin datos |
 |   | sensibles; búsqueda aislada por tenant. |
 
+Regla de organización: una cuenta/empresa es un tenant y sus tiendas son sucursales. Una persona puede tener memberships en varios tenants y sucursales usando un único `User`. Los roles iniciales son fijos y se traducen a permissions/policies en el servidor; no se crean roles personalizados ni un `TenantGroup` para reportes cross-tenant hasta que exista una necesidad validada.
+
 ## Invariantes de base de datos
 
 - Todas las entidades de negocio incluyen tenant_id NOT NULL; sucursal debe pertenecer al mismo tenant mediante FK compuesta o validación transaccional y restricciones.
 
-- Crear UNIQUE(tenant_id,id) donde existan FK compuestas; índice UNIQUE(tenant_id,user_id) en membresías; UNIQUE(tenant_id,idempotency_key) por operación; índices alineados con consultas.
+- Crear UNIQUE(tenant_id,id) donde existan FK compuestas; `UNIQUE(tenant_id,user_id)` en tenant memberships y `UNIQUE(tenant_id,branch_id,user_id)` en branch memberships; `UNIQUE(tenant_id,idempotency_key)` por operación; índices alineados con consultas.
+- `BranchMembership(tenant_id,branch_id)` referencia `Branch(tenant_id,id)` y `(tenant_id,user_id)` referencia `TenantMembership(tenant_id,user_id)`; ambas evitan membresías cruzadas.
+- `TenantOwner`/`TenantAdmin` tienen alcance de todas las sucursales; `TenantMember` necesita asignación de sucursal. Un gerente solo accede a sus sucursales explícitas. Todo tenant conserva al menos un TenantOwner activo.
 
 - Usar numeric(p,s) o decimal en .NET para dinero y cantidades; definir gramos/ml/unidades explícitamente. Usar timestamptz en UTC y la zona America/Bogota en reportes/presentación.
 
@@ -119,7 +123,7 @@ Identity: usuario global único; PlatformRole (PlatformAdmin, SupportOperator) n
 | Método / ruta | Propósito y controles |
 | --- | --- |
 | POST /api/v1/auth/login | Autenticación, anti-enumeración, rate limiting, MFA condicional. |
-| GET /api/v1/me/context | Identidad y memberships; roles de plataforma aparte. |
+| GET /api/v1/me/context | Identidad y memberships disponibles; roles/contexto plataforma separados del contexto tenant. |
 | GET /api/v1/platform/tenants | Solo PlatformAdmin; SIN tenant activo. |
 | GET/POST /api/v1/essences | Tenant auth; búsqueda paginada, SKU único, límite plan. |
 | POST /api/v1/inventory/adjustments | Movimiento y balance transaccional; motivo/permiso. |
@@ -167,27 +171,35 @@ Terminado cuando: Desarrollador nuevo levanta proyecto siguiendo README.
 
 Objetivo: Esquema inicial versionado
 
-- Modelar User, Tenant, Branch, Membership y valores de dominio; definir migrations EF Core.
+- [x] Alinear el dominio con ADR-004 antes de persistirlo: `User` global; `Tenant`, `Branch`, `TenantMembership` (`TenantOwner`, `TenantAdmin`, `TenantMember`) y `BranchMembership` (`BranchManager`, `BranchStaff`, estado). Membership revocada se reinvita sobre la misma fila.
 
-- Crear datos seed solo para desarrollo con dos tenants, dos sucursales y roles.
+- Mantener documentado que `PlatformRole` es independiente de `TenantMembership`; su implementación y el contexto `/platform` corresponden al Paso 04. No incorporar `PlatformAdmin` a memberships de negocio ni usar un rol `SuperBoss`.
 
-- Agregar índices y constraints compuestos de pertenencia.
+- [x] Identity: `IdentityDbContext`, configuración de `User` y migración `InitialIdentity`, con tabla de historial propia.
 
-Validaciones y pruebas: Pruebas: migrar BD vacía; migrar dos veces sin romper; FK cruzada entre empresas debe fallar.
+- [x] Tenancy: `TenancyDbContext`, configuraciones de entidades, constraints compuestos e historial de migraciones separado.
 
-Terminado cuando: Migraciones automáticas comprobadas en BD de test.
+- [x] Crear datos seed idempotentes solo para desarrollo: dos tenants, tres sucursales, roles tenant/sucursal y Camila con memberships de gerente en más de una sucursal. No se seed-ean contraseñas; los roles de plataforma se seed-ean por separado en el Paso 04.
+
+- [x] Agregar índices y constraints compuestos de pertenencia; el índice único de email de Identity también está creado.
+
+Validaciones y pruebas: Testcontainers aplica ambos contextos a una BD vacía, repite migraciones y seeds sin duplicar, verifica constraints únicos (`23505`), rechaza referencias cross-tenant (`23503`) y demuestra que dos cambios concurrentes no eliminan al último TenantOwner. Unit tests verifican reinvitación sobre la misma fila.
+
+Terminado: Migraciones, constraints, seeds y la invariante del último TenantOwner se verifican automáticamente en PostgreSQL de test/CI.
 
 ## Paso 04 · Separar Platform Admin de tenant
 
 Objetivo: Corregir el problema de identidad estructural
 
-- Diseñar login global y selección de workspace solo para usuarios tenant.
+- Diseñar login global y selección de workspace solo para usuarios con memberships tenant; un mismo User puede pertenecer a varios tenants.
 
-- PlatformAdmin accede a /platform sin tenant en cookie/token/contexto; restringir endpoint con policy propia.
+- `PlatformAdmin` y `SupportOperator` viven separados de los roles/memberships tenant. PlatformAdmin accede a `/platform` sin tenant activo y administra cuentas globales de usuario, tenants, planes y configuración SaaS; el rol no autoriza cambiar memberships de negocio ni leer datos operativos tenant.
+
+- Al provisionar un tenant, invitar/asignar explícitamente a su primer `TenantOwner`. El soporte no consulta datos de negocio sin una concesión explícita; el flujo temporal auditado se completa en Paso 18.
 
 - Crear endpoints /me/context y /platform/tenants, claims mínimos y roles verificables en BD.
 
-Validaciones y pruebas: Unit: políticas; integration: admin global sin tenant entra /platform pero no lee datos de empresa sin autorización; admin tenant no entra /platform.
+Validaciones y pruebas: Unit: políticas; integration: PlatformAdmin sin tenant puede operar en `/platform` pero no leer datos de tenant; un TenantOwner/Admin no obtiene acceso a `/platform` por ese rol; un usuario con ambos contextos debe autorizarlos de forma independiente.
 
 Terminado cuando: Matriz autorización plataforma/tenant/sucursal en verde.
 
@@ -209,13 +221,17 @@ Terminado cuando: Auth E2E; sin passwords/secretos en logs.
 
 Objetivo: Cero filtraciones entre perfumerías
 
-- Implementar ITenantContext resuelto desde ruta/sesión verificada, no desde body arbitrario.
+- Implementar `ITenantContext` y el alcance de sucursal desde ruta/sesión y memberships verificadas; nunca desde body arbitrario.
 
-- Políticas para ver/crear/editar/ajustar y membership por sucursal; consulta base filtrada por tenant.
+- Implementar policies fijas del servidor: TenantOwner/TenantAdmin abarcan todas las sucursales; TenantMember requiere BranchMembership; BranchManager administra solo BranchStaff de sus sucursales; BranchStaff no administra usuarios.
+
+- Impedir escalada de privilegios: solo TenantOwner asigna/revoca TenantAdmin y transfiere propiedad; TenantOwner/Admin pueden administrar roles de sucursal; BranchManager solo gestiona BranchStaff de sus sucursales; TenantAdmin no cambia facturación.
+
+- Las memberships asignadas en varias sucursales conceden solo la unión de esos alcances; los reportes se agregan únicamente sobre sucursales autorizadas.
 
 - Evaluar RLS, middleware de conexión y conexión pooling; añadir suite de ataques cross-tenant.
 
-Validaciones y pruebas: Integration: tenant A no lee/edita ids tenant B; branch A no altera branch B; include, SQL raw y background jobs respetan contexto.
+Validaciones y pruebas: tenant A no lee/edita tenant B; gerente de sucursal A no consulta ni administra B; empleado no accede a otra sucursal; TenantOwner/Admin sí tienen alcance tenant-wide; IDs de tenant/sucursal manipulados no elevan permisos; Include, SQL raw y background jobs respetan el contexto; tests de grants impiden asignar roles superiores.
 
 Terminado cuando: Ningún test de aislamiento se salta: gate bloqueante de merge.
 
@@ -380,13 +396,15 @@ Terminado cuando: Sandbox end-to-end + reconciliación proveedor/BD.
 
 Objetivo: Operación del SaaS
 
-- Soporte PlatformStaff accesible globalmente por scope explícito; usuario tenant solo tickets propios.
+- Soporte `SupportOperator` accesible globalmente por scope explícito; usuario tenant solo tickets propios.
+
+- Definir la política de aprobación/consentimiento y luego implementar concesiones temporales de soporte con tenant/sucursal, permisos mínimos, motivo/ticket, expiración, actor y auditoría; solo lectura por defecto.
 
 - Outbox + worker para email/notificaciones/stock bajo; claves anti-duplicado.
 
 - Audit event estructurado con diff sanitizado, actor, tenant, correlación y retención.
 
-Validaciones y pruebas: Tests: reintentos worker no duplican notificación; soporte no filtra ticket; logs sin PII crítica.
+Validaciones y pruebas: reintentos worker no duplican notificación; SupportOperator sin grant no lee datos de tenant; grant vencido/fuera de scope se rechaza; acceso y cambios quedan auditados; logs sin PII crítica.
 
 Terminado cuando: Eventos recuperables después de caída del worker.
 
@@ -394,13 +412,13 @@ Terminado cuando: Eventos recuperables después de caída del worker.
 
 Objetivo: Aprender Angular sin reescribir todo a ciegas
 
-- Crear shell standalone, lazy routes /app y /platform, services API tipados y manejo común de errores.
+- Crear shell standalone, lazy routes `/app` y `/platform`, selección de tenant y selector de sucursal según memberships, services API tipados y manejo común de errores.
 
 - Usar reactive forms, Signals para estado local, interceptors y guards UX (no seguridad real).
 
 - Implementar slices conforme endpoints listos, tests de componentes y accesibilidad.
 
-Validaciones y pruebas: Tests: login/selección tenant, permisos de controles, formularios inválidos, errores 409/422, loading y vacío.
+Validaciones y pruebas: login/selección de tenant y sucursal, vistas de dueño/admin/gerente/empleado, permisos de controles, formularios inválidos, errores 409/422, loading y vacío. Los guards son UX, no autorización real.
 
 Terminado cuando: Frontend sin acceso directo a PostgreSQL/Supabase.
 
@@ -414,7 +432,7 @@ Objetivo: Validación de recorridos de negocio
 
 - Pruebas de recuperación de fallo, operación duplicada, reintentos y auditoría.
 
-Validaciones y pruebas: Tests: suite con tenants A/B, permisos, intento de IDOR, webhook spoofing y acciones simultáneas.
+Validaciones y pruebas: suite con tenants A/B, sucursales A1/A2, roles de plataforma/tenant/sucursal, escalada de privilegios, IDOR, soporte sin/con grant, webhook spoofing y acciones simultáneas.
 
 Terminado cuando: Criterios de seguridad y regresión verdes en CI.
 
@@ -483,16 +501,15 @@ Secuencia de dependencias: Identity/Tenancy -> Catalog -> Inventory -> Sales -> 
 
 | Rol | Contexto | Capacidades |
 | --- | --- | --- |
-| PlatformAdmin | /platform sin tenant | Gestionar empresas/planes/facturación de plataforma; |
-|   |   | operaciones sensibles auditadas. |
-| SupportOperator | /platform sin tenant | Responder tickets y diagnósticos limitados; acceso excepcional a |
-|   |   | datos auditado. |
-| TenantOwner/Admin | /app/{tenant} | Administrar equipo, sucursales, configuración y negocio según |
-|   |   | permisos. |
-| Staff | /app/{tenant} | Registrar venta/conteos y consultar solo módulos y sucursales |
-|   |   | concedidos. |
+| PlatformAdmin | /platform sin tenant | Gestionar cuentas globales de usuario, empresas/tenants, planes y facturación SaaS; sin lectura implícita de datos de negocio. Operaciones sensibles auditadas. |
+| SupportOperator | /platform sin tenant | Responder tickets y diagnósticos limitados; datos de negocio solo con concesión temporal, acotada y auditada. |
+| TenantOwner | /app/{tenant} | Alcance de todo el tenant; administra equipo, sucursales, configuración, reportes y facturación; transfiere propiedad de forma auditada. |
+| TenantAdmin | /app/{tenant} | Alcance operativo de todas las sucursales; gestiona equipo y operación, sin transferir propiedad ni gestionar facturación. |
+| TenantMember | /app/{tenant} | Membresía base; sin acceso operativo hasta tener una o más memberships de sucursal. |
+| BranchManager | /app/{tenant}/branches/{branch} | Solo sucursales asignadas; reportes locales y gestión de BranchStaff de esas sucursales; no concede roles tenant ni de gerente. |
+| BranchStaff | /app/{tenant}/branches/{branch} | Ejecuta acciones autorizadas por módulo en sus sucursales asignadas; no administra usuarios. |
 
-Política estricta: nunca dar al PlatformAdmin acceso implícito a todas las ventas solo por su rol. Implementar operaciones de soporte con autorización separada, justificación, expiración, consentimiento si corresponde y auditoría. No mezclar super_admin con user_tenants.
+Política estricta: PlatformAdmin no accede a ventas/stock por su rol; SupportOperator requiere concesión temporal, acotada, justificada y auditada (solo lectura por defecto). No mezclar roles de plataforma con `TenantMembership`. `TenantOwner`/`TenantAdmin` tienen alcance tenant-wide; los roles de sucursal se limitan a las sucursales asignadas. Todo tenant conserva al menos un TenantOwner activo.
 
 
 ## 8. Entregables por PR y plantilla de aprendizaje
@@ -506,6 +523,8 @@ Preguntas para entrevista tras cada módulo: ¿Qué rompe bajo concurrencia? ¿C
 ## 9. Criterios de salida a producción
 
 - 0 violaciones en la suite tenant-isolation e IDOR; MFA y sesiones revisadas.
+
+- Policies verificadas para PlatformAdmin, SupportOperator, TenantOwner, TenantAdmin, TenantMember, BranchManager y BranchStaff; cero escaladas de rol o alcance.
 
 - Ventas, recibos y pagos idempotentes; stock nunca negativo o inconsistente tras concurrencia.
 

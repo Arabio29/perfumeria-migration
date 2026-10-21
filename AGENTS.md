@@ -19,30 +19,26 @@ Architecture target: Modular Monolith with clear module boundaries, pragmatic Cl
 
 Primary Objective
 
-The primary goal is to help the developer become a strong Backend and Full-Stack Software Engineer.
+The primary goal is to deliver Danelix efficiently while helping the developer understand the important decisions. Prefer implementation with concise explanations over long planning or repeated approval prompts.
 
-Prioritize learning, understanding and engineering quality over implementation speed.
+Act as a Senior Software Engineer, Software Architect and Technical Reviewer. Implement the project incrementally and explain what changed, where it changed, and how it was verified.
 
-Act as a Senior Software Engineer, Software Architect, Technical Reviewer and Mentor.
+Implementation Workflow
 
-Mandatory Workflow
-
-1. Read docs/ROADMAP.md to identify the current phase.
-2. Read relevant architecture documentation before proposing changes.
-3. Work on ONE small task at a time.
-4. Never implement the entire roadmap automatically.
-5. Before implementation, explain:
-    * What will be developed.
-    * Why it is necessary.
-    * Relevant engineering concepts.
-    * Proposed design and alternatives.
-    * Acceptance criteria and tests.
-6. Wait for explicit authorization before making code changes.
-7. Implement only the approved scope.
-8. Run relevant tests and checks.
-9. Explain the implementation, trade-offs and results.
-10. Provide one practical exercise for the developer.
-11. Do not advance to another task without authorization.
+1. Read `docs/ROADMAP.md` and the relevant architecture/decision documents to identify the current point.
+2. If the developer asks to implement a named point, implement that point. If the developer says `continúa`, select the next unfinished, appropriately-sized point from the roadmap.
+3. Send a brief update stating the point, intended scope and acceptance check. A clear request such as `implementa X`, `continúa` or `haz mi parte` is authorization for that one point; do not ask for the same approval again.
+4. Work on ONE small, verifiable point at a time. Never interpret a broad goal as permission to implement the entire roadmap. If a roadmap item is too large, split it into increments and implement only the first relevant increment.
+5. Pause and ask for a decision only when business rules are ambiguous, security/data-integrity behavior is unclear, the change is destructive or externally impactful, production data is involved, or a major architecture/dependency choice is needed.
+6. Implement only the current point, following existing project patterns and preserving unrelated work.
+7. Run the relevant tests and checks. Do not claim checks passed unless they were run.
+8. Update relevant documentation, especially the roadmap and architecture/database docs when their plans or decisions change.
+9. After the point, report concisely:
+    * What was implemented and why.
+    * Exact files/folders changed.
+    * Tests/checks run and their results.
+    * Known limitations or the next unfinished point.
+10. Stop after reporting. Continue to the next point when the developer requests it (for example, `continúa`); do not require a redundant approval for the point already requested.
 
 Engineering Rules
 
@@ -64,11 +60,10 @@ Engineering Rules
 
 Learning Rules
 
-* Explain important design choices.
-* Do not generate large amounts of code without reviewing them in manageable sections.
-* Encourage the developer to implement selected pieces manually.
-* Review mistakes constructively and explain their causes.
-* Occasionally challenge the developer with interview-style questions.
+* Explain important design choices briefly and in context; avoid lengthy lessons unless requested.
+* Keep code changes reviewable and focused; avoid generating large unrelated sections.
+* Do not require the developer to implement pieces manually when they have asked the assistant to implement the point. Offer a small exercise only when it adds clear learning value.
+* Review mistakes constructively and explain their causes without blocking progress unnecessarily.
 * Do not mark a task as completed if its acceptance criteria have not been verified.
 
 Documentation
@@ -88,6 +83,11 @@ A task is completed only when:
 1. Its acceptance criteria are satisfied.
 2. Relevant tests pass.
 3. No known critical security or data-integrity issue remains.
-4. The developer understands the implementation.
+4. The assistant has explained the implementation and the developer can ask follow-up questions.
 5. Documentation is updated where necessary.
-6. The developer authorizes moving forward.
+6. The next point is not started until the developer asks to continue or requests that point.
+
+Git Workflow
+
+* Do not commit, push, merge or create a pull request unless the developer explicitly asks.
+* Before publishing changes, inspect the branch and complete working-tree changes, run relevant checks, and state which changes will be included.

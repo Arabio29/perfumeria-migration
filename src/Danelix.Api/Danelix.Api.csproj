@@ -12,6 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Modules\Identity\Danelix.Modules.Identity.csproj" />
+    <ProjectReference Include="..\Modules\Tenancy\Danelix.Modules.Tenancy.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Controllers\" />
   </ItemGroup>
 

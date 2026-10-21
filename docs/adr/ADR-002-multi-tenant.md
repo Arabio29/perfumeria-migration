@@ -51,3 +51,7 @@ El mercado objetivo son pymes; el volumen de datos por tenant es moderado y dece
 - Nunca aceptar `tenant_id`/`branch_id` del cliente como autorización; derivarlos del servidor.
 - El PlatformAdmin no obtiene acceso implícito a ventas, stock ni cuentas; las operaciones de soporte requieren autorización explícita, justificación y auditoría.
 - Toda tabla nueva de negocio nace con `tenant_id` (y `branch_id` si aplica) e índices que empiezan por esas columnas.
+
+## Refinamiento posterior
+
+La taxonomía y el alcance concreto de los roles tenant/sucursal se especifican en [ADR-004](ADR-004-autorizacion-por-ambitos.md). ADR-004 reemplaza únicamente la descripción general de roles de esta decisión; se mantienen la base compartida, la resolución de tenant en el servidor y las reglas de aislamiento aquí aceptadas.
