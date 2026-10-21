@@ -36,7 +36,7 @@ public class DevelopmentDatabaseTests
         await connection.OpenAsync();
 
         await AssertSeedCountsAsync(connection);
-        Assert.Equal(1L, await ExecuteCountAsync(connection, "SELECT count(*) FROM __ef_migrations_history_identity"));
+        Assert.Equal(2L, await ExecuteCountAsync(connection, "SELECT count(*) FROM __ef_migrations_history_identity"));
         Assert.Equal(1L, await ExecuteCountAsync(connection, "SELECT count(*) FROM __ef_migrations_history_tenancy"));
 
         var camilaId = await ExecuteGuidAsync(
@@ -51,6 +51,10 @@ public class DevelopmentDatabaseTests
             connection,
             "SELECT id FROM users WHERE normalized_email = @email",
             ("email", "diego@danelix.local"));
+        var valentinaId = await ExecuteGuidAsync(
+            connection,
+            "SELECT id FROM users WHERE normalized_email = @email",
+            ("email", "valentina@danelix.local"));
         var auroraTenantId = await ExecuteGuidAsync(
             connection,
             "SELECT id FROM tenants WHERE slug = @slug",
@@ -76,6 +80,43 @@ public class DevelopmentDatabaseTests
                 connection,
                 "SELECT count(*) FROM branch_memberships WHERE user_id = @user_id AND role = 'Manager'",
                 ("user_id", camilaId)));
+
+        Assert.Equal(
+            1L,
+            await ExecuteCountAsync(
+                connection,
+                "SELECT count(*) FROM platform_roles WHERE user_id = @user_id AND role = 'PlatformAdmin'",
+                ("user_id", marioId)));
+        Assert.Equal(
+            1L,
+            await ExecuteCountAsync(
+                connection,
+                "SELECT count(*) FROM platform_roles WHERE user_id = @user_id AND role = 'SupportOperator'",
+                ("user_id", valentinaId)));
+
+        Assert.Equal(
+            "23503",
+            await ExpectPostgresErrorAsync(
+                connection,
+                "INSERT INTO platform_roles (user_id, role, granted_at_utc) VALUES (@user_id, 'PlatformAdmin', @granted_at_utc)",
+                ("user_id", Guid.NewGuid()),
+                ("granted_at_utc", DateTimeOffset.UtcNow)));
+
+        Assert.Equal(
+            "23505",
+            await ExpectPostgresErrorAsync(
+                connection,
+                "INSERT INTO platform_roles (user_id, role, granted_at_utc) VALUES (@user_id, 'PlatformAdmin', @granted_at_utc)",
+                ("user_id", marioId),
+                ("granted_at_utc", DateTimeOffset.UtcNow)));
+
+        Assert.Equal(
+            "23514",
+            await ExpectPostgresErrorAsync(
+                connection,
+                "INSERT INTO platform_roles (user_id, role, granted_at_utc) VALUES (@user_id, 'SuperBoss', @granted_at_utc)",
+                ("user_id", valentinaId),
+                ("granted_at_utc", DateTimeOffset.UtcNow)));
 
         Assert.Equal(
             "23503",
@@ -209,6 +250,7 @@ public class DevelopmentDatabaseTests
     private static async Task AssertSeedCountsAsync(NpgsqlConnection connection)
     {
         Assert.Equal(6L, await ExecuteCountAsync(connection, "SELECT count(*) FROM users"));
+        Assert.Equal(2L, await ExecuteCountAsync(connection, "SELECT count(*) FROM platform_roles"));
         Assert.Equal(2L, await ExecuteCountAsync(connection, "SELECT count(*) FROM tenants"));
         Assert.Equal(3L, await ExecuteCountAsync(connection, "SELECT count(*) FROM branches"));
         Assert.Equal(6L, await ExecuteCountAsync(connection, "SELECT count(*) FROM tenant_memberships"));
