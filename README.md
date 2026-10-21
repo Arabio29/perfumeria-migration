@@ -16,17 +16,22 @@ SaaS multi-tenant para perfumerías. Este repositorio reconstruye la plataforma 
 | Ruta | Contenido |
 | --- | --- |
 | `src/Danelix.Api` | Host de la API (middleware, composición, `Program.cs`) |
+| `src/SharedKernel` | Primitivas de dominio compartidas (`DomainException`) |
 | `src/Modules/*` | Módulos del monolito (Identity, Tenancy, Catalog, Inventory…; se agregan por incremento) |
+| `tests/Unit` | Pruebas unitarias de dominio (xUnit) |
 | `tests/Integration` | Pruebas de integración (xUnit + `WebApplicationFactory`) |
-| `docs/` | [Roadmap](docs/ROADMAP.md), [ADRs](docs/DECISIONS.md) y documentación de arquitectura |
+| `docs/` | [Roadmap](docs/ROADMAP.md), [arquitectura](docs/ARCHITECTURE.md), [modelo de datos](docs/DATABASE.md) y [ADRs](docs/DECISIONS.md) |
 | `infra/compose` | Servicios locales de desarrollo (PostgreSQL) |
 
-`tests/Unit`, `tests/Architecture` y `tests/E2E` se crearán cuando exista contenido para ellos.
+`tests/Architecture` y `tests/E2E` se crearán cuando exista contenido para ellos.
 
 ## Documentación
 
 - [docs/ROADMAP.md](docs/ROADMAP.md) — plan maestro por pasos; fuente de verdad del avance.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — límites de plataforma, tenant y sucursal.
+- [docs/DATABASE.md](docs/DATABASE.md) — modelo de datos objetivo; no implementado completo.
 - [docs/DECISIONS.md](docs/DECISIONS.md) — índice de ADRs (decisiones de arquitectura).
+- [docs/LEARNING.md](docs/LEARNING.md) — bitácora de aprendizaje y ejercicios.
 - [AGENTS.md](AGENTS.md) — reglas de trabajo para asistentes de código.
 
 ## Requisitos
