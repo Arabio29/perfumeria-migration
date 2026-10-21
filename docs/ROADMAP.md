@@ -4,7 +4,7 @@ Plan maestro de reconstrucción del SaaS de perfumerías Arquitectura, datos, AP
 
 Edición: octubre 2026 | Enfoque: aprender construyendo | Origen: esquema SQL y descripción funcional proporcionados por el propietario
 
-**Estado de avance (oct 2026):** Pasos 02 y 03 cerrados: dominio Identity/Tenancy, dos `DbContext`, migraciones separadas, seed Development e integración Testcontainers para migraciones, constraints, idempotencia y concurrencia de TenantOwner. Siguiente: Paso 04, separar PlatformRole y el contexto `/platform`.
+**Estado de avance (oct 2026):** Pasos 02 y 03 cerrados: dominio Identity/Tenancy, dos `DbContext`, migraciones separadas, seed Development e integración Testcontainers para migraciones, constraints, idempotencia y concurrencia de TenantOwner. Paso 04 en curso: `PlatformAdmin`/`SupportOperator` ya se persisten en Identity, separados de las memberships de negocio; faltan `/me/context`, policies y `/platform/tenants`.
 
 REGLA CENTRAL: conservar la operación actual mientras se construye y verifica una plataforma nueva en paralelo. No ejecutar el esquema recibido directamente: se facilitó solo como contexto.
 
@@ -195,11 +195,15 @@ Objetivo: Corregir el problema de identidad estructural
 
 - `PlatformAdmin` y `SupportOperator` viven separados de los roles/memberships tenant. PlatformAdmin accede a `/platform` sin tenant activo y administra cuentas globales de usuario, tenants, planes y configuración SaaS; el rol no autoriza cambiar memberships de negocio ni leer datos operativos tenant.
 
+- [x] Persistir los roles globales en `platform_roles` (Identity), con `UNIQUE(user_id, role)`, FK a `users` y sin `tenant_id`. El seed de desarrollo asigna `PlatformAdmin` a Mario y `SupportOperator` a Valentina.
+
 - Al provisionar un tenant, invitar/asignar explícitamente a su primer `TenantOwner`. El soporte no consulta datos de negocio sin una concesión explícita; el flujo temporal auditado se completa en Paso 18.
 
 - Crear endpoints /me/context y /platform/tenants, claims mínimos y roles verificables en BD.
 
 Validaciones y pruebas: Unit: políticas; integration: PlatformAdmin sin tenant puede operar en `/platform` pero no leer datos de tenant; un TenantOwner/Admin no obtiene acceso a `/platform` por ese rol; un usuario con ambos contextos debe autorizarlos de forma independiente.
+
+Progreso: roles globales persistidos y verificados con constraints; políticas, claims y endpoints siguen pendientes.
 
 Terminado cuando: Matriz autorización plataforma/tenant/sucursal en verde.
 

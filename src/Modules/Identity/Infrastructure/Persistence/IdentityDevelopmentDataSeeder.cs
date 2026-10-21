@@ -34,5 +34,22 @@ internal static class IdentityDevelopmentDataSeeder
 
         dbContext.Users.AddRange(users.Where(user => !existingIds.Contains(user.Id)));
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var platformRoles = new[]
+        {
+            PlatformRoleAssignment.Create(MarioId, PlatformRole.PlatformAdmin, SeedCreatedAtUtc),
+            PlatformRoleAssignment.Create(ValentinaId, PlatformRole.SupportOperator, SeedCreatedAtUtc),
+        };
+
+        var existingPlatformRoles = (await dbContext.PlatformRoles
+                .Where(assignment => seedIds.Contains(assignment.UserId))
+                .Select(assignment => new { assignment.UserId, assignment.Role })
+                .ToListAsync(cancellationToken))
+            .Select(assignment => (assignment.UserId, assignment.Role))
+            .ToHashSet();
+
+        dbContext.PlatformRoles.AddRange(
+            platformRoles.Where(assignment => !existingPlatformRoles.Contains((assignment.UserId, assignment.Role))));
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

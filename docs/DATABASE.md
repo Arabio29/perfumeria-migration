@@ -7,7 +7,7 @@ Este documento describe el esquema objetivo y **no implica que las tablas o cons
 | Tabla | Alcance | Datos/relaciones principales |
 | --- | --- | --- |
 | `users` | Global | Identidad, email normalizado único, nombre, estado y timestamps. No contiene roles de tenant. |
-| `platform_roles` | Global/plataforma | Roles `PlatformAdmin`/`SupportOperator`, separados de memberships de negocio. |
+| `platform_roles` | Global/plataforma | `user_id`, `role` (`PlatformAdmin`/`SupportOperator`) y `granted_at_utc`; clave compuesta `(user_id, role)`, separada de memberships de negocio. |
 | `tenants` | Cuenta de negocio | Nombre, slug único si se usa como ruta global, estado y timestamps. |
 | `branches` | Tenant + sucursal | `tenant_id`, nombre, código, estado; una sucursal pertenece a un tenant. |
 | `tenant_memberships` | Tenant + usuario | Una relación por usuario/tenant; rol `TenantOwner`, `TenantAdmin` o `TenantMember`; estado. `user_id` es referencia opaca a Identity conforme a ADR-003. |
@@ -18,6 +18,7 @@ La identidad de una persona es única y puede tener memberships en varios tenant
 ## Constraints e índices requeridos
 
 - `users`: `UNIQUE(normalized_email)`.
+- `platform_roles`: `PRIMARY KEY(user_id, role)` y FK `user_id` a `users(id)`; el rol se valida con constraint. La asignación no reemplaza el estado de la cuenta: la autorización debe comprobar que el `User` siga activo.
 - `tenants`: `UNIQUE(slug)` cuando el slug identifica al tenant globalmente en la ruta.
 - `branches`: `UNIQUE(tenant_id, code)` y `UNIQUE(tenant_id, id)` para permitir FKs compuestas.
 - `tenant_memberships`: `UNIQUE(tenant_id, user_id)`; agregar índice de acceso por `user_id`.
@@ -41,11 +42,11 @@ Por ADR-003, `tenant_memberships.user_id` no tiene inicialmente una FK a `users`
 
 ## Estado de persistencia
 
-- **Implementado:** `IdentityDbContext` mapea `users`; `InitialIdentity` crea email normalizado único, estado con constraint y `timestamptz`. `TenancyDbContext` mapea tenants, sucursales y memberships.
-- **Seeds:** API en `Development` aplica las migraciones y carga usuarios/tenants/sucursales/memberships de ejemplo. No crea contraseñas y no se ejecuta en `Testing` ni producción.
+- **Implementado:** `IdentityDbContext` mapea `users` y `platform_roles`; `InitialIdentity` crea email normalizado único, estado con constraint y `timestamptz`; `AddPlatformRoles` añade roles globales con clave compuesta, FK `Restrict` y constraint de rol. `TenancyDbContext` mapea tenants, sucursales y memberships.
+- **Seeds:** API en `Development` aplica las migraciones y carga usuarios/tenants/sucursales/memberships de ejemplo, además de `PlatformAdmin` para Mario y `SupportOperator` para Valentina. No crea contraseñas y no se ejecuta en `Testing` ni producción.
 - **Versiones:** EF Core/Design/Relational `10.0.13`, proveedor Npgsql EF `10.0.3` y herramienta local `dotnet-ef` `10.0.13` fijada en `dotnet-tools.json`.
 - **Historial:** Identity usa `__ef_migrations_history_identity`; Tenancy usa `__ef_migrations_history_tenancy`.
-- **Verificación automatizada:** `DevelopmentDatabaseTests` usa Testcontainers para migrar ambos contextos dos veces, ejecutar el seed dos veces, verificar constraints únicas, rechazar FKs cruzadas y probar concurrentemente el último TenantOwner.
+- **Verificación automatizada:** `DevelopmentDatabaseTests` usa Testcontainers para migrar ambos contextos dos veces, ejecutar el seed dos veces, verificar constraints únicas, rechazar FKs cruzadas, validar el constraint de `platform_roles` por rol inválido y probar concurrentemente el último TenantOwner.
 - **Enums:** se persisten como strings legibles con constraints para valores cerrados. Renombrar un valor persistido requiere una migración de datos/esquema.
 
 ## Invariante de propietario

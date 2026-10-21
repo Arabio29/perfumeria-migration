@@ -22,6 +22,33 @@ namespace Danelix.Modules.Identity.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Danelix.Modules.Identity.Domain.PlatformRoleAssignment", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("role");
+
+                    b.Property<DateTimeOffset>("GrantedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at_utc");
+
+                    b.HasKey("UserId", "Role")
+                        .HasName("pk_platform_roles");
+
+                    b.HasIndex("Role")
+                        .HasDatabaseName("ix_platform_roles_role");
+
+                    b.ToTable("platform_roles", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_platform_roles_role", "role IN ('PlatformAdmin', 'SupportOperator')");
+                        });
+                });
+
             modelBuilder.Entity("Danelix.Modules.Identity.Domain.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -61,6 +88,15 @@ namespace Danelix.Modules.Identity.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("ck_users_status", "status IN ('Active', 'Disabled')");
                         });
+                });
+
+            modelBuilder.Entity("Danelix.Modules.Identity.Domain.PlatformRoleAssignment", b =>
+                {
+                    b.HasOne("Danelix.Modules.Identity.Domain.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

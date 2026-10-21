@@ -14,9 +14,12 @@ public sealed class IdentityDbContext : DbContext
 
     internal DbSet<User> Users => Set<User>();
 
+    internal DbSet<PlatformRoleAssignment> PlatformRoles => Set<PlatformRoleAssignment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new UserConfiguration());
+        modelBuilder.ApplyConfiguration(new PlatformRoleAssignmentConfiguration());
         base.OnModelCreating(modelBuilder);
     }
 }
