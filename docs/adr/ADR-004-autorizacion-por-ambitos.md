@@ -70,7 +70,9 @@ El nombre `SuperBoss` no se usará en el dominio: el caso descrito corresponde a
 - Un usuario puede pertenecer a varios tenants y a varias sucursales del mismo tenant usando el mismo `User` global.
 - `TenantMembership` contiene el rol general del usuario; `BranchMembership` contiene el rol y estado en la sucursal.
 - La base de datos impone unicidad de membership y claves foráneas compuestas que impiden asociar una membership a una sucursal o usuario de otro tenant.
+- Revocar una membership conserva su fila; una reinvitación la reactiva en la misma fila. No se crean memberships duplicadas por usuario/tenant ni usuario/sucursal. La capa de aplicación registrará eventos de revocación y reinvitación en auditoría cuando ese módulo exista.
 - Cada tenant debe conservar al menos un `TenantOwner` activo. La transferencia o revocación del último propietario se realiza de forma transaccional y auditable.
+- Los cambios de rol/estado de memberships pasan por el administrador de memberships: bloquea la fila del tenant con `FOR UPDATE`, cuenta propietarios activos y modifica la membership dentro de la misma transacción. La autorización del actor sigue siendo responsabilidad de la policy/endpoints.
 - Administrar una membership no equivale a borrar la identidad global del usuario. La baja de un empleado se limita al tenant o sucursal correspondiente.
 
 ### 6. Evolución

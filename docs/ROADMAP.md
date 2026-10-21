@@ -4,7 +4,7 @@ Plan maestro de reconstrucción del SaaS de perfumerías Arquitectura, datos, AP
 
 Edición: octubre 2026 | Enfoque: aprender construyendo | Origen: esquema SQL y descripción funcional proporcionados por el propietario
 
-**Estado de avance (oct 2026):** Paso 02 cerrado — solución .NET 10 con health checks y tests de integración, monorepo con calidad básica (editorconfig/analizadores), PostgreSQL 17 + pgvector en Docker Compose, ADR-001 a ADR-004 y CI en GitHub Actions. Paso 03 en curso: el dominio inicial Identity/Tenancy y tests unitarios existen; falta alinear roles y alcance según ADR-004 antes de mapear EF Core o crear migraciones. Siguiente: ajustar dominio/tests y luego persistencia.
+**Estado de avance (oct 2026):** Pasos 02 y 03 cerrados: dominio Identity/Tenancy, dos `DbContext`, migraciones separadas, seed Development e integración Testcontainers para migraciones, constraints, idempotencia y concurrencia de TenantOwner. Siguiente: Paso 04, separar PlatformRole y el contexto `/platform`.
 
 REGLA CENTRAL: conservar la operación actual mientras se construye y verifica una plataforma nueva en paralelo. No ejecutar el esquema recibido directamente: se facilitó solo como contexto.
 
@@ -171,19 +171,21 @@ Terminado cuando: Desarrollador nuevo levanta proyecto siguiendo README.
 
 Objetivo: Esquema inicial versionado
 
-- Alinear el dominio con ADR-004 antes de persistirlo: `User` global; `Tenant`, `Branch`, `TenantMembership` (`TenantOwner`, `TenantAdmin`, `TenantMember`) y `BranchMembership` (`BranchManager`, `BranchStaff`, estado).
+- [x] Alinear el dominio con ADR-004 antes de persistirlo: `User` global; `Tenant`, `Branch`, `TenantMembership` (`TenantOwner`, `TenantAdmin`, `TenantMember`) y `BranchMembership` (`BranchManager`, `BranchStaff`, estado). Membership revocada se reinvita sobre la misma fila.
 
-- Registrar `PlatformRole` en Identity, separado de `TenantMembership`; no incorporar `PlatformAdmin` a memberships de negocio ni usar un rol `SuperBoss`.
+- Mantener documentado que `PlatformRole` es independiente de `TenantMembership`; su implementación y el contexto `/platform` corresponden al Paso 04. No incorporar `PlatformAdmin` a memberships de negocio ni usar un rol `SuperBoss`.
 
-- Mapear el dominio con EF Core y generar migraciones separadas por módulo/contexto conforme a ADR-003.
+- [x] Identity: `IdentityDbContext`, configuración de `User` y migración `InitialIdentity`, con tabla de historial propia.
 
-- Crear datos seed solo para desarrollo que demuestren dos tenants, varias sucursales, roles tenant/sucursal y un usuario con memberships en más de una sucursal. Los roles de plataforma se seed-ean por separado.
+- [x] Tenancy: `TenancyDbContext`, configuraciones de entidades, constraints compuestos e historial de migraciones separado.
 
-- Agregar índices y constraints compuestos de pertenencia.
+- [x] Crear datos seed idempotentes solo para desarrollo: dos tenants, tres sucursales, roles tenant/sucursal y Camila con memberships de gerente en más de una sucursal. No se seed-ean contraseñas; los roles de plataforma se seed-ean por separado en el Paso 04.
 
-Validaciones y pruebas: migrar BD vacía y dos veces; FK de sucursal/membership cruzada entre tenants debe fallar; probar unicidad de memberships y que un tenant no quede sin TenantOwner activo bajo operaciones concurrentes.
+- [x] Agregar índices y constraints compuestos de pertenencia; el índice único de email de Identity también está creado.
 
-Terminado cuando: Migraciones automáticas comprobadas en BD de test.
+Validaciones y pruebas: Testcontainers aplica ambos contextos a una BD vacía, repite migraciones y seeds sin duplicar, verifica constraints únicos (`23505`), rechaza referencias cross-tenant (`23503`) y demuestra que dos cambios concurrentes no eliminan al último TenantOwner. Unit tests verifican reinvitación sobre la misma fila.
+
+Terminado: Migraciones, constraints, seeds y la invariante del último TenantOwner se verifican automáticamente en PostgreSQL de test/CI.
 
 ## Paso 04 · Separar Platform Admin de tenant
 

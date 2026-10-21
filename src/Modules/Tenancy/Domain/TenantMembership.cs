@@ -31,6 +31,16 @@ internal sealed class TenantMembership
 
     public DateTimeOffset CreatedAtUtc { get; }
 
+    public void ChangeRole(TenantRole newRole)
+    {
+        if (!Enum.IsDefined(newRole))
+        {
+            throw new DomainException("El rol de la membresía no es válido.");
+        }
+
+        Role = newRole;
+    }
+
     public static TenantMembership Create(
         Guid tenantId,
         Guid userId,
@@ -87,6 +97,16 @@ internal sealed class TenantMembership
         if (Status == MembershipStatus.Revoked)
         {
             throw new DomainException("Una membresía revocada no se puede reactivar.");
+        }
+
+        Status = MembershipStatus.Active;
+    }
+
+    public void Reinvite()
+    {
+        if (Status != MembershipStatus.Revoked)
+        {
+            throw new DomainException("Solo se puede re-invitar una membresía revocada.");
         }
 
         Status = MembershipStatus.Active;

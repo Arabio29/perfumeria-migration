@@ -1,13 +1,11 @@
 using System.Net;
-using Microsoft.AspNetCore.Mvc.Testing;
-
 namespace Danelix.Api.Tests;
 
-public class HealthEndpointTests : IClassFixture<WebApplicationFactory<Program>>
+public class HealthEndpointTests : IClassFixture<DanelixApiFactory>
 {
     private readonly HttpClient _client;
 
-    public HealthEndpointTests(WebApplicationFactory<Program> factory)
+    public HealthEndpointTests(DanelixApiFactory factory)
     {
         _client = factory.CreateClient();
     }

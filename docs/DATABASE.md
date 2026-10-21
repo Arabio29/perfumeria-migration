@@ -37,13 +37,41 @@ Por ADR-003, `tenant_memberships.user_id` no tiene inicialmente una FK a `users`
 - Un usuario puede tener roles distintos en sucursales distintas; por ejemplo, gerente en una y empleado en otra.
 - Cada tenant conserva al menos un `TenantOwner` activo. La baja/transferencia se valida dentro de una transacción y se registra en auditoría; un índice único por sí solo no garantiza esta regla.
 - Desactivar una membership no elimina la identidad global ni memberships de otros tenants.
+- Revocar una membership conserva la fila; una reinvitación reactiva esa misma fila. No usar índices únicos parciales para liberar la clave. La auditoría futura conservará eventos de revocación/reinvitación.
 
-## Pendientes antes de crear las migraciones
+## Estado de persistencia
 
-1. Alinear el dominio del Paso 03.1 con `TenantMember`, `BranchRole` y el estado de `BranchMembership`.
-2. Decidir el ciclo de vida de una membership revocada y si una reinvitación reactiva la fila o crea un nuevo periodo histórico. Evitar duplicados activos y conservar auditoría.
-3. Decidir cómo serializar roles/estados en PostgreSQL (por ejemplo, valores string con validación o códigos estables) y cómo se manejan cambios de enum en migraciones.
-4. Mapear FKs e índices mediante configuraciones EF Core y verificar con PostgreSQL real/Testcontainers.
-5. Probar que una FK cruzada tenant/sucursal falla y que constraints únicos devuelven el error esperado.
+- **Implementado:** `IdentityDbContext` mapea `users`; `InitialIdentity` crea email normalizado único, estado con constraint y `timestamptz`. `TenancyDbContext` mapea tenants, sucursales y memberships.
+- **Seeds:** API en `Development` aplica las migraciones y carga usuarios/tenants/sucursales/memberships de ejemplo. No crea contraseñas y no se ejecuta en `Testing` ni producción.
+- **Versiones:** EF Core/Design/Relational `10.0.13`, proveedor Npgsql EF `10.0.3` y herramienta local `dotnet-ef` `10.0.13` fijada en `dotnet-tools.json`.
+- **Historial:** Identity usa `__ef_migrations_history_identity`; Tenancy usa `__ef_migrations_history_tenancy`.
+- **Verificación automatizada:** `DevelopmentDatabaseTests` usa Testcontainers para migrar ambos contextos dos veces, ejecutar el seed dos veces, verificar constraints únicas, rechazar FKs cruzadas y probar concurrentemente el último TenantOwner.
+- **Enums:** se persisten como strings legibles con constraints para valores cerrados. Renombrar un valor persistido requiere una migración de datos/esquema.
+
+## Invariante de propietario
+
+EF Core serializa cambios de rol/estado por tenant con una transacción y `SELECT ... FOR UPDATE` sobre la fila del tenant. Luego cuenta otros propietarios activos antes de modificar la membership. La prueba Testcontainers intenta demover a dos propietarios simultáneamente y verifica que uno quede activo.
+
+## Comandos EF Core (Identity)
+
+Desde la raíz del repositorio, restaurar la herramienta local una vez:
+
+```powershell
+dotnet tool restore
+```
+
+La fábrica de diseño requiere `DANELIX_IDENTITY_CONNECTION_STRING`. Usar solo la conexión local de desarrollo o una base de test desechable; nunca una conexión de producción.
+
+```powershell
+$env:DANELIX_IDENTITY_CONNECTION_STRING = "Host=localhost;Port=5432;Database=danelix;Username=danelix;Password=danelix_dev"
+dotnet ef migrations list --project src/Modules/Identity --startup-project src/Modules/Identity --context IdentityDbContext
+dotnet ef database update --project src/Modules/Identity --startup-project src/Modules/Identity --context IdentityDbContext
+Remove-Item Env:DANELIX_IDENTITY_CONNECTION_STRING
+
+$env:DANELIX_TENANCY_CONNECTION_STRING = "Host=localhost;Port=5432;Database=danelix;Username=danelix;Password=danelix_dev"
+dotnet ef migrations list --project src/Modules/Tenancy --startup-project src/Modules/Tenancy --context TenancyDbContext
+dotnet ef database update --project src/Modules/Tenancy --startup-project src/Modules/Tenancy --context TenancyDbContext
+Remove-Item Env:DANELIX_TENANCY_CONNECTION_STRING
+```
 
 Todos los timestamps se almacenan en UTC (`timestamptz`). El valor de un ID o una ruta enviado por el cliente nunca sustituye la autorización del servidor. RLS y roles de base de datos se especificarán por separado como defensa en profundidad.

@@ -38,6 +38,7 @@ SaaS multi-tenant para perfumerías. Este repositorio reconstruye la plataforma 
 
 - .NET SDK 10
 - Docker Desktop (PostgreSQL local)
+- Herramientas locales del repositorio: `dotnet tool restore` (EF Core CLI)
 
 ## Base de datos (desarrollo)
 
@@ -55,6 +56,8 @@ docker compose -f infra/compose/docker-compose.yml ps   # debe mostrar (healthy)
 
 ## Ejecutar la API
 
+En `Development`, el arranque aplica las migraciones pendientes de Identity/Tenancy y carga datos de ejemplo idempotentes. Requiere PostgreSQL local saludable. Esto no se ejecuta en `Testing` ni en producción.
+
 ```powershell
 dotnet run --project src/Danelix.Api
 ```
@@ -62,6 +65,8 @@ dotnet run --project src/Danelix.Api
 - Salud: `https://localhost:7002/health`. El perfil HTTP (`http://localhost:5289`) redirige a HTTPS.
 
 ## Pruebas
+
+Las pruebas de integración usan Testcontainers para levantar un PostgreSQL desechable; Docker Desktop debe estar ejecutándose.
 
 ```powershell
 dotnet test Danelix.sln

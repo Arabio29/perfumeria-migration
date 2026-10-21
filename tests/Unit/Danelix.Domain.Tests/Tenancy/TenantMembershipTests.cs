@@ -52,6 +52,31 @@ public class TenantMembershipTests
     }
 
     [Fact]
+    public void ChangeRole_ChangesRole()
+    {
+        // Arrange
+        var membership = TenantMembership.Create(TenantId, UserId, TenantRole.Member, CreatedAt);
+
+        // Act
+        membership.ChangeRole(TenantRole.Admin);
+
+        // Assert
+        Assert.Equal(TenantRole.Admin, membership.Role);
+    }
+
+    [Fact]
+    public void ChangeRole_Throws_WhenRoleIsInvalid()
+    {
+        // Arrange
+        var membership = TenantMembership.Create(TenantId, UserId, TenantRole.Member, CreatedAt);
+        var invalidRole = (TenantRole)99;
+
+        // Act & Assert
+        Assert.Throws<DomainException>(() => membership.ChangeRole(invalidRole));
+        Assert.Equal(TenantRole.Member, membership.Role);
+    }
+
+    [Fact]
     public void Suspend_ChangesStatusToSuspended()
     {
         // Arrange
@@ -100,5 +125,29 @@ public class TenantMembershipTests
 
         // Act & Assert
         Assert.Throws<DomainException>(membership.Activate);
+    }
+
+    [Fact]
+    public void Reinvite_ChangesRevokedMembershipToActive()
+    {
+        // Arrange
+        var membership = TenantMembership.Create(TenantId, UserId, TenantRole.Member, CreatedAt);
+        membership.Revoke();
+
+        // Act
+        membership.Reinvite();
+
+        // Assert
+        Assert.Equal(MembershipStatus.Active, membership.Status);
+    }
+
+    [Fact]
+    public void Reinvite_Throws_WhenMembershipIsNotRevoked()
+    {
+        // Arrange
+        var membership = TenantMembership.Create(TenantId, UserId, TenantRole.Member, CreatedAt);
+
+        // Act & Assert
+        Assert.Throws<DomainException>(membership.Reinvite);
     }
 }

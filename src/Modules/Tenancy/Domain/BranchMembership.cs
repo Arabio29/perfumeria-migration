@@ -9,12 +9,15 @@ internal sealed class BranchMembership
         Guid tenantId,
         Guid branchId,
         Guid userId,
+        BranchRole role,
         DateTimeOffset createdAtUtc)
     {
         Id = id;
         TenantId = tenantId;
         BranchId = branchId;
         UserId = userId;
+        Role = role;
+        Status = MembershipStatus.Active;
         CreatedAtUtc = createdAtUtc;
     }
 
@@ -26,12 +29,17 @@ internal sealed class BranchMembership
 
     public Guid UserId { get; }
 
+    public BranchRole Role { get; private set; }
+
+    public MembershipStatus Status { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; }
 
     public static BranchMembership Create(
         Guid tenantId,
         Guid branchId,
         Guid userId,
+        BranchRole role,
         DateTimeOffset createdAtUtc,
         Guid? id = null)
     {
@@ -50,6 +58,11 @@ internal sealed class BranchMembership
             throw new DomainException("El usuario de la membresía de sucursal es obligatorio.");
         }
 
+        if (!Enum.IsDefined(role))
+        {
+            throw new DomainException("El rol de la membresía de sucursal no es válido.");
+        }
+
         var membershipId = id ?? Guid.CreateVersion7();
         if (membershipId == Guid.Empty)
         {
@@ -66,6 +79,57 @@ internal sealed class BranchMembership
             tenantId,
             branchId,
             userId,
+            role,
             createdAtUtc.ToUniversalTime());
+    }
+
+    public void ChangeRole(BranchRole newRole)
+    {
+        if (!Enum.IsDefined(newRole))
+        {
+            throw new DomainException("El rol de la membresía de sucursal no es válido.");
+        }
+
+        Role = newRole;
+    }
+
+    public void Suspend()
+    {
+        if (Status == MembershipStatus.Revoked)
+        {
+            throw new DomainException("Una membresía revocada no se puede suspender.");
+        }
+
+        Status = MembershipStatus.Suspended;
+    }
+
+    public void Activate()
+    {
+        if (Status == MembershipStatus.Revoked)
+        {
+            throw new DomainException("Una membresía revocada no se puede reactivar.");
+        }
+
+        Status = MembershipStatus.Active;
+    }
+
+    public void Reinvite()
+    {
+        if (Status != MembershipStatus.Revoked)
+        {
+            throw new DomainException("Solo se puede re-invitar una membresía revocada.");
+        }
+
+        Status = MembershipStatus.Active;
+    }
+
+    public void Revoke()
+    {
+        if (Status == MembershipStatus.Revoked)
+        {
+            return;
+        }
+
+        Status = MembershipStatus.Revoked;
     }
 }

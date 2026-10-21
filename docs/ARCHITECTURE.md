@@ -60,4 +60,4 @@ El catálogo exacto de permisos por módulo (ventas, inventario, catálogo, repo
 
 ## Estado actual
 
-ADR-004 fija el modelo objetivo. El dominio creado en el Paso 03.1 aún debe alinearse: `TenantRole` actualmente contiene `Staff` y `BranchMembership` todavía no tiene rol/estado. Esa actualización está planificada antes de EF Core y las migraciones, para evitar versionar un esquema con alcances incorrectos.
+ADR-004 fija el modelo objetivo. El dominio de tenant/sucursal ya expresa `TenantRole` (`Owner`, `Admin`, `Member`) y `BranchRole` (`Manager`, `Staff`), con estado y reinvitación en ambas memberships. Identity y Tenancy tienen `DbContext`, migraciones e inicialización idempotente limitada a `Development`; Testcontainers verifica migraciones, seed, aislamiento de FKs y la protección concurrente del último propietario. `PlatformRole` y `/platform` se implementan en el Paso 04.

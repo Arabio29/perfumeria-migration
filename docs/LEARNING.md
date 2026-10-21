@@ -21,16 +21,17 @@ Registro de conceptos, decisiones y ejercicios de cada incremento. No sustituye 
 - **Tiempo:** `DateTimeOffset` normalizado a UTC y validado contra `default`.
 - **Invariantes locales vs. globales:** el dominio valida formato y estado; la unicidad de email, slug, código de sucursal y membresía se impone en la base de datos.
 - **Excepciones de dominio:** `DomainException` comunica una violación de regla de negocio, no un error técnico.
+- **EF Core inicial:** `Email` se convierte a una columna normalizada; enums se guardan como strings con constraints. Npgsql y EF Core deben usar versiones compatibles; fijar `Relational` evita que NuGet seleccione una dependencia transitiva más antigua.
 
 ### Decisiones y deudas
 
 - ADR-004 fija roles distintos por alcance: `TenantOwner`, `TenantAdmin`, `TenantMember`, `BranchManager` y `BranchStaff`; `PlatformAdmin` y `SupportOperator` son roles globales separados.
 - Los roles iniciales son fijos y se mapean a permisos/policies en servidor. Los permisos granulares por módulo se implementan en el Paso 06; los roles personalizables no se construirán sin necesidad validada.
-- El código actual aún no está alineado con ADR-004: `TenantRole` incluye `Staff` y `BranchMembership` carece de rol/estado. Debe corregirse y probarse antes del mapeo EF Core.
+- El dominio tenant/sucursal ya está alineado con ADR-004: `TenantRole` es `Owner`/`Admin`/`Member`, y `BranchMembership` tiene `BranchRole` (`Manager`/`Staff`) y estado. `PlatformRole` y `/platform` corresponden al Paso 04; policies ejecutables al Paso 06.
 - `TenantOwner`/`TenantAdmin` tienen alcance de todas las sucursales; los usuarios `TenantMember` requieren memberships explícitas de sucursal.
 - No hay FK entre módulos. `TenantMembership.UserId` es un identificador opaco; la existencia del usuario se validará en aplicación.
 - La transacción cross-módulo sigue pendiente. ADR-003 la marca como decisión obligatoria antes del Paso 11.
-- No hay EF Core, migraciones ni seeds todavía.
+- Identity y Tenancy tienen `DbContext` y migraciones separadas; seeds solo en `Development`. Testcontainers verifica idempotencia, constraints tenant/sucursal y la protección concurrente del último `TenantOwner` mediante bloqueo de fila.
 
 ### Ejercicio
 
@@ -42,7 +43,7 @@ Implementa `TenantMembership.ChangeRole(TenantRole newRole)`:
 
 ### Preguntas abiertas
 
-- ¿La membresía revocada debe liberar el par `(tenant_id, user_id)` mediante un índice único parcial?
+- La membership revocada conserva la fila y la reinvitación la reactiva; la auditoría debe registrar ambas transiciones cuando se implemente el módulo de auditoría.
 - ¿Qué tabla o mecanismo usará el coordinador de transacciones cross-módulo?
 - ¿Cómo se validará la existencia del usuario al crear una membresía?
 - ¿Cuándo se introduce RLS y con qué rol de base de datos?
